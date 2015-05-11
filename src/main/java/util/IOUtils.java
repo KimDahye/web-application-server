@@ -2,6 +2,8 @@ package util;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class IOUtils {
 	/**
@@ -14,5 +16,24 @@ public class IOUtils {
 		char[] body = new char[contentLength];
 		br.read(body, 0, contentLength);
 		return String.copyValueOf(body);
+	}
+	
+	public static String getMethod(String line) {
+		String[] tokens = line.split(" ");
+		return tokens[0];
+	}
+	
+	public static Map<String, String> getURI(String line) {
+		Map<String, String> res = new HashMap<String, String>();
+		String[] tokens = line.split(" ");
+		
+		String[] tokens2 = tokens[1].split("\\?");
+		
+		res.put("uri", tokens[1]);
+		res.put("filename", tokens2[0]);
+		if(tokens2.length > 1) {
+			res.put("params", tokens2[1]);
+		}
+		return res;
 	}
 }

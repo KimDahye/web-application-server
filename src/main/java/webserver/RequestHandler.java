@@ -1,17 +1,27 @@
 package webserver;
 
+import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.util.Map;
+
+import model.User;
+import model.UserDatabase;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import util.HttpRequestUtils;
+import util.IOUtils;
+
 public class RequestHandler extends Thread {
 	private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
-	
 	private Socket connection;
 
 	public RequestHandler(Socket connectionSocket) {
@@ -23,8 +33,30 @@ public class RequestHandler extends Thread {
 		
 		try (InputStream in = connection.getInputStream(); OutputStream out = connection.getOutputStream()) {
 			// TODO 사용자 요청에 대한 처리는 이 곳에 구현하면 된다.
+			
+			InputStreamReader reader = new InputStreamReader(in);
+			BufferedReader br = new BufferedReader(reader);
+			String line = br.readLine();
+			Map<String, String> map = IOUtils.getURI(line);
+			String uri =  map.get("uri");
+			String filename = map.get("filename");
+			String params = map.get("params");
+			log.debug("uri: {}, filename: {}, params: {}", uri , filename, params);
+			
+			if(filename.equals("/")){
+				log.debug("filename is empty.default filename is index.html");
+				filename += "index.html";
+			}
+			else if(filename.equals("/create")){
+				Map<String, String> parameters = HttpRequestUtils.parseQueryString(params);
+				User user = new User(parameters.get("userId"), parameters.get("password"), parameters.get("name"), parameters.get("email"));
+				UserDatabase.putUser(user);
+				filename = "/index.html";
+			}	
+	
+			byte[] body = Files.readAllBytes(new File("./webapp" + filename).toPath());
 			DataOutputStream dos = new DataOutputStream(out);
-			byte[] body = "Hello World".getBytes();
+			//byte[] body = "Hello World".getBytes();
 			response200Header(dos, body.length);
 			responseBody(dos, body);
 		} catch (IOException e) {
