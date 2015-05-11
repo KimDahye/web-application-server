@@ -41,4 +41,15 @@ public class IOUtils {
 		String[] tokens = line.split(" ");
 		return Integer.parseInt(tokens[1]);
 	}
+
+	public static String getLoginCookie(String line) {
+		String[] tokens = line.split(" ");
+		int i;
+		for(i = 0; i < tokens.length; i++) {
+			if(tokens[i].startsWith("logined")) {
+				break;
+			}
+		}
+		return tokens[i];
+	}
 }

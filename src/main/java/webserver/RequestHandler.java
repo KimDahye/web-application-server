@@ -40,7 +40,8 @@ public class RequestHandler extends Thread {
 			String firstLine = br.readLine();			
 			String headerLine = firstLine;
 			int contentLength = 0;
-			
+			String cookie = "logined=false";
+
 			if(firstLine == null) {
 				return;
 			}
@@ -49,8 +50,11 @@ public class RequestHandler extends Thread {
 				if(headerLine.startsWith("Content-Length")){
 					contentLength = IOUtils.getContentLength(headerLine);
 				}
+				if(headerLine.startsWith("Cookie") && IOUtils.getLoginCookie(headerLine) != null) {
+					cookie = IOUtils.getLoginCookie(headerLine);
+				}
 				headerLine = br.readLine();
-				//log.info(lastLine);
+				log.info(headerLine);
 			}
 			
 			Map<String, String> map = IOUtils.getURI(firstLine);
@@ -60,11 +64,13 @@ public class RequestHandler extends Thread {
 			String params = map.get("params");
 			log.debug("method: {}, uri: {}, filename: {}, params: {}", method, uri , filename, params);
 			
+			DataOutputStream dos = new DataOutputStream(out);
+			
+			/*request mapping*/
 			if(filename.equals("/")){
 				log.debug("filename is empty.default filename is index.html");
 				filename += "index.html";
 			}
-			
 			else if(filename.equals("/create")){
 				Map<String, String> parameters = null;
 				if(method.equals("GET")){
@@ -77,25 +83,69 @@ public class RequestHandler extends Thread {
 				User user = new User(parameters.get("userId"), parameters.get("password"), parameters.get("name"), parameters.get("email"));
 				log.debug(user.toString());
 				UserDatabase.putUser(user);
-				filename = "/index.html";
-			}	
-	
+				
+				response302Header(dos);
+				return;
+			}
+			else if(filename.equals("/login")){
+				Map<String, String> parameters = null;
+				if(method.equals("GET")){
+					parameters = HttpRequestUtils.parseQueryString(params);
+				}
+				else if (method.equals("POST")){
+					parameters = HttpRequestUtils.parseQueryString(IOUtils.readData(br, contentLength));
+					
+				}
+				User user = new User(parameters.get("userId"), parameters.get("password"));
+				if(UserDatabase.isCorrectUser(user)) {
+					//Set-Cookie: logined=true를 response 헤더에 추가해야 함
+					cookie = "logined=true";
+				}
+				response302HeaderWithCookie(dos, cookie);
+				return;
+				
+			}
+			
 			byte[] body = Files.readAllBytes(new File("./webapp" + filename).toPath());
-			DataOutputStream dos = new DataOutputStream(out);
-			//byte[] body = "Hello World".getBytes();
-			response200Header(dos, body.length);
+			response200HeaderWithCookie(dos, body.length, cookie);
 			responseBody(dos, body);
 		} catch (IOException e) {
 			log.error(e.getMessage());
 		}
 	}
-
-	private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
+	
+	private void response200HeaderWithCookie(DataOutputStream dos, int lengthOfBodyContent, String cookie){
+		//log.debug("cookie: {}", cookie);
 		try {
 			dos.writeBytes("HTTP/1.1 200 Document Follows \r\n");
 			dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
 			dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+			dos.writeBytes("Set-Cookie: " + cookie + "\r\n");
 			dos.writeBytes("\r\n");
+		} catch (IOException e) {
+			log.error(e.getMessage());
+		}
+	}
+	
+	private void response302Header(DataOutputStream dos) {
+
+		try {
+			dos.writeBytes("HTTP/1.1 302 Found \r\n");
+			dos.writeBytes("Location: /index.html\r\n");
+			dos.flush();
+		} catch (IOException e) {
+			log.error(e.getMessage());
+		}
+	}
+	
+	private void response302HeaderWithCookie(DataOutputStream dos, String cookie) {
+		log.debug("cookie: {}", cookie);
+
+		try {
+			dos.writeBytes("HTTP/1.1 302 Found \r\n");
+			dos.writeBytes("Location: /index.html\r\n");
+			dos.writeBytes("Set-Cookie: " + cookie + "\r\n");
+			dos.flush();
 		} catch (IOException e) {
 			log.error(e.getMessage());
 		}
