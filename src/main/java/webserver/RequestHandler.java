@@ -36,20 +36,46 @@ public class RequestHandler extends Thread {
 			
 			InputStreamReader reader = new InputStreamReader(in);
 			BufferedReader br = new BufferedReader(reader);
-			String line = br.readLine();
-			Map<String, String> map = IOUtils.getURI(line);
+			log.debug("---- http request ----");
+			String firstLine = br.readLine();			
+			String headerLine = firstLine;
+			int contentLength = 0;
+			
+			if(firstLine == null) {
+				return;
+			}
+			
+			while(!"".equals(headerLine)) {
+				if(headerLine.startsWith("Content-Length")){
+					contentLength = IOUtils.getContentLength(headerLine);
+				}
+				headerLine = br.readLine();
+				//log.info(lastLine);
+			}
+			
+			Map<String, String> map = IOUtils.getURI(firstLine);
+			String method = IOUtils.getMethod(firstLine);
 			String uri =  map.get("uri");
 			String filename = map.get("filename");
 			String params = map.get("params");
-			log.debug("uri: {}, filename: {}, params: {}", uri , filename, params);
+			log.debug("method: {}, uri: {}, filename: {}, params: {}", method, uri , filename, params);
 			
 			if(filename.equals("/")){
 				log.debug("filename is empty.default filename is index.html");
 				filename += "index.html";
 			}
+			
 			else if(filename.equals("/create")){
-				Map<String, String> parameters = HttpRequestUtils.parseQueryString(params);
+				Map<String, String> parameters = null;
+				if(method.equals("GET")){
+					parameters = HttpRequestUtils.parseQueryString(params);
+				}
+				else if (method.equals("POST")){
+					parameters = HttpRequestUtils.parseQueryString(IOUtils.readData(br, contentLength));
+				}
+				log.debug("userId: {}", parameters.get("userId"));
 				User user = new User(parameters.get("userId"), parameters.get("password"), parameters.get("name"), parameters.get("email"));
+				log.debug(user.toString());
 				UserDatabase.putUser(user);
 				filename = "/index.html";
 			}	

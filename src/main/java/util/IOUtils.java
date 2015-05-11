@@ -36,4 +36,9 @@ public class IOUtils {
 		}
 		return res;
 	}
+	
+	public static int getContentLength(String line) {
+		String[] tokens = line.split(" ");
+		return Integer.parseInt(tokens[1]);
+	}
 }
