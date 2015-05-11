@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import util.HttpRequestUtils;
 import util.IOUtils;
+import util.HttpRequestUtils.Pair;
 
 public class RequestHandler extends Thread {
 	private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
@@ -41,6 +42,7 @@ public class RequestHandler extends Thread {
 			String headerLine = firstLine;
 			int contentLength = 0;
 			String cookie = "logined=false";
+			String contentType = "text/html";
 
 			if(firstLine == null) {
 				return;
@@ -50,8 +52,13 @@ public class RequestHandler extends Thread {
 				if(headerLine.startsWith("Content-Length")){
 					contentLength = IOUtils.getContentLength(headerLine);
 				}
-				if(headerLine.startsWith("Cookie") && IOUtils.getLoginCookie(headerLine) != null) {
+				else if(headerLine.startsWith("Cookie") && IOUtils.getLoginCookie(headerLine) != null) {
 					cookie = IOUtils.getLoginCookie(headerLine);
+				}
+				else if(headerLine.startsWith("Accept:")) {
+					Pair pair = HttpRequestUtils.parseHeader(headerLine);
+					contentType = pair.getValue();
+					log.debug("----- accept: {}", contentType);
 				}
 				headerLine = br.readLine();
 				log.info(headerLine);
@@ -107,18 +114,18 @@ public class RequestHandler extends Thread {
 			}
 			
 			byte[] body = Files.readAllBytes(new File("./webapp" + filename).toPath());
-			response200HeaderWithCookie(dos, body.length, cookie);
+			response200Header(dos, body.length, cookie, contentType);
 			responseBody(dos, body);
 		} catch (IOException e) {
 			log.error(e.getMessage());
 		}
 	}
 	
-	private void response200HeaderWithCookie(DataOutputStream dos, int lengthOfBodyContent, String cookie){
+	private void response200Header(DataOutputStream dos, int lengthOfBodyContent, String cookie, String contentType){
 		//log.debug("cookie: {}", cookie);
 		try {
 			dos.writeBytes("HTTP/1.1 200 Document Follows \r\n");
-			dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+			dos.writeBytes("Content-Type: " + contentType + ";charset=utf-8\r\n");
 			dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
 			dos.writeBytes("Set-Cookie: " + cookie + "\r\n");
 			dos.writeBytes("\r\n");
